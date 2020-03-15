@@ -1,0 +1,87 @@
+buildscript {
+    ext.fasterxml_version = '2.9.5'
+}
+
+plugins {
+    id "org.jetbrains.kotlin.jvm" version "1.2.51"
+    id 'org.springframework.boot' version '2.0.1.RELEASE'
+    id "jacoco"
+}
+
+apply plugin: 'idea'
+apply plugin: 'io.spring.dependency-management'
+
+apply from: "$rootDir/gradle/versioning.gradle"
+
+group = 'jalgoarena'
+description = """JAlgoArena Ranking"""
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+jar {
+    baseName = 'jalgoarena-ranking'
+}
+
+task stage {
+    dependsOn 'bootJar'
+
+    dependencyManagement {
+        imports {
+            mavenBom 'org.springframework.cloud:spring-cloud-dependencies:Finchley.RELEASE'
+        }
+    }
+}
+
+dependencies {
+    compile "com.fasterxml.jackson.core:jackson-databind:$fasterxml_version",
+            "com.fasterxml.jackson.core:jackson-core:$fasterxml_version",
+            "com.fasterxml.jackson.core:jackson-annotations:$fasterxml_version",
+            "com.fasterxml.jackson.module:jackson-module-kotlin:$fasterxml_version",
+            "org.springframework.kafka:spring-kafka",
+            "org.springframework.boot:spring-boot-starter-webflux",
+            "org.springframework.boot:spring-boot-starter-actuator",
+            "org.springframework.boot:spring-boot-starter-cache",
+            "org.jetbrains.kotlin:kotlin-stdlib",
+            'net.logstash.logback:logstash-logback-encoder:5.1',
+            'com.github.ben-manes.caffeine:caffeine'
+
+    testCompile 'junit:junit:4.12',
+            'pl.pragmatists:JUnitParams:1.0.5',
+            "org.springframework.kafka:spring-kafka-test:2.1.4.RELEASE",
+            "org.springframework.boot:spring-boot-starter-test",
+            'com.nhaarman:mockito-kotlin-kt1.1:1.5.0'
+}
+
+apply plugin: 'jacoco'
+
+jacocoTestReport {
+    reports {
+        xml.enabled = true
+        html.enabled = true
+    }
+}
+
+check.dependsOn jacocoTestReport
+
+defaultTasks 'clean', 'bootJar'
+
+task releaseZip(type: Zip, dependsOn: 'bootJar') {
+    from('build/libs/') {
+        include('*.jar')
+    }
+    from 'run.sh'
+    archiveName "JAlgoArena-Ranking-${version}.zip"
+    destinationDir(file('build/libs'))
+}
+
+task buildDockerImage(type: Exec, dependsOn: 'bootJar') {
+    commandLine 'docker',  'build', '-t', "jalgoarena/ranking:${version}", '.'
+}
+
+task pushDockerImages(type: Exec, dependsOn: 'buildDockerImage') {
+    commandLine 'docker',  'push', "jalgoarena/ranking:${version}"
+}
